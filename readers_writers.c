@@ -1,28 +1,41 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <unistd.h>
 
-sem_t mutex, writeblock;
-int data = 0, readcount = 0;
+// Semaphores
+sem_t mutex;     // Protects read_count
+sem_t rw_mutex;  // Controls access to shared resource
+sem_t queue;     // Ensures writer priority
+
+int read_count = 0;
 
 // Reader function
-void* reader(void* arg) {
-    sem_wait(&mutex);          // Protect readcount
-    readcount++;
+void *reader(void *arg) {
+    int id = *(int *)arg;
 
-    if (readcount == 1)
-        sem_wait(&writeblock); // First reader blocks writer
+    sem_wait(&queue);   // Block if writer is waiting
+    sem_wait(&mutex);
+
+    read_count++;
+
+    if (read_count == 1)
+        sem_wait(&rw_mutex); // First reader blocks writers
 
     sem_post(&mutex);
+    sem_post(&queue);
 
     // Reading section
-    printf("Reader is reading data = %d\n", data);
+    printf("Reader %d is READING\n", id);
+    sleep(1);
+    printf("Reader %d has FINISHED READING\n", id);
 
     sem_wait(&mutex);
-    readcount--;
 
-    if (readcount == 0)
-        sem_post(&writeblock); // Last reader allows writer
+    read_count--;
+
+    if (read_count == 0)
+        sem_post(&rw_mutex); // Last reader allows writer
 
     sem_post(&mutex);
 
@@ -30,30 +43,49 @@ void* reader(void* arg) {
 }
 
 // Writer function
-void* writer(void* arg) {
-    sem_wait(&writeblock);  // Writer gets exclusive access
+void *writer(void *arg) {
+    int id = *(int *)arg;
 
-    data++; // Writing
-    printf("Writer updated data to %d\n", data);
+    sem_wait(&queue);     // Writer gets priority
+    sem_wait(&rw_mutex);  // Exclusive access
 
-    sem_post(&writeblock);
+    // Writing section
+    printf("\tWriter %d is WRITING\n", id);
+    sleep(2);
+    printf("\tWriter %d has FINISHED WRITING\n", id);
+
+    sem_post(&rw_mutex);
+    sem_post(&queue);
 
     return NULL;
 }
 
 int main() {
-    pthread_t r1, r2, w1;
+    pthread_t readers[5], writers[5];
+    int id[5];
 
+    // Initialize semaphores
     sem_init(&mutex, 0, 1);
-    sem_init(&writeblock, 0, 1);
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&queue, 0, 1);
 
-    pthread_create(&r1, NULL, reader, NULL);
-    pthread_create(&r2, NULL, reader, NULL);
-    pthread_create(&w1, NULL, writer, NULL);
+    // Create threads
+    for (int i = 0; i < 5; i++) {
+        id[i] = i + 1;
+        pthread_create(&readers[i], NULL, reader, &id[i]);
+        pthread_create(&writers[i], NULL, writer, &id[i]);
+    }
 
-    pthread_join(r1, NULL);
-    pthread_join(r2, NULL);
-    pthread_join(w1, NULL);
+    // Join threads
+    for (int i = 0; i < 5; i++) {
+        pthread_join(readers[i], NULL);
+        pthread_join(writers[i], NULL);
+    }
+
+    // Destroy semaphores
+    sem_destroy(&mutex);
+    sem_destroy(&rw_mutex);
+    sem_destroy(&queue);
 
     return 0;
 }

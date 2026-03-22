@@ -1,60 +1,53 @@
 #include <stdio.h>
 
 int main() {
-    int n, m;
+    int n = 3, m = 2;
 
-    printf("Enter number of processes: ");
-    scanf("%d", &n);
+    int allocation[3][2] = {
+        {1, 0},
+        {0, 1},
+        {1, 1}
+    };
 
-    printf("Enter number of resources: ");
-    scanf("%d", &m);
+    int max[3][2] = {
+        {1, 1},
+        {1, 1},
+        {2, 2}
+    };
 
-    int alloc[n][m], max[n][m], need[n][m];
-    int avail[m];
+    int available[2] = {0, 0};
 
-    // Input Allocation Matrix
-    printf("\nEnter Allocation Matrix:\n");
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < m; j++)
-            scanf("%d", &alloc[i][j]);
-
-    // Input Max Matrix
-    printf("\nEnter Max Matrix:\n");
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < m; j++)
-            scanf("%d", &max[i][j]);
-
-    // Input Available Resources
-    printf("\nEnter Available Resources:\n");
-    for (int i = 0; i < m; i++)
-        scanf("%d", &avail[i]);
-
-    // Calculate Need Matrix
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < m; j++)
-            need[i][j] = max[i][j] - alloc[i][j];
-
-    int finish[n], safeSeq[n];
-    for (int i = 0; i < n; i++)
-        finish[i] = 0;
-
+    int need[3][2];
+    int finish[3] = {0};
+    int work[2];
+    int safeSeq[3];
     int count = 0;
 
-    // Banker's Algorithm Logic
+    // Calculate Need matrix
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++)
+            need[i][j] = max[i][j] - allocation[i][j];
+
+    // Initialize Work = Available
+    for (int i = 0; i < m; i++)
+        work[i] = available[i];
+
+    // Safety Algorithm
     while (count < n) {
         int found = 0;
 
         for (int i = 0; i < n; i++) {
             if (!finish[i]) {
                 int j;
+
                 for (j = 0; j < m; j++) {
-                    if (need[i][j] > avail[j])
+                    if (need[i][j] > work[j])
                         break;
                 }
 
                 if (j == m) {
                     for (int k = 0; k < m; k++)
-                        avail[k] += alloc[i][k];
+                        work[k] += allocation[i][k];
 
                     safeSeq[count++] = i;
                     finish[i] = 1;
@@ -63,18 +56,23 @@ int main() {
             }
         }
 
-        if (!found) {
-            printf("\nSystem is NOT in safe state\n");
-            return 0;
-        }
+        if (!found)
+            break;
     }
 
-    // Output Safe Sequence
-    printf("\nSystem is in safe state.\nSafe sequence: ");
-    for (int i = 0; i < n; i++)
-        printf("P%d ", safeSeq[i]);
-
-    printf("\n");
+    // Output Result
+    if (count == n) {
+        printf("System is in SAFE state\nSafe sequence: ");
+        for (int i = 0; i < n; i++)
+            printf("P%d ", safeSeq[i]);
+        printf("\n");
+    } else {
+        printf("System is in DEADLOCK (UNSAFE STATE)\nDeadlocked processes: ");
+        for (int i = 0; i < n; i++)
+            if (!finish[i])
+                printf("P%d ", i);
+        printf("\n");
+    }
 
     return 0;
 }
