@@ -14,18 +14,18 @@ int read_count = 0;
 void *reader(void *arg) {
     int id = *(int *)arg;
 
-    sem_wait(&queue);   // Block if writer is waiting
+    sem_wait(&queue);     // Wait if writers are waiting
     sem_wait(&mutex);
 
     read_count++;
-
-    if (read_count == 1)
-        sem_wait(&rw_mutex); // First reader blocks writers
+    if (read_count == 1) {
+        sem_wait(&rw_mutex);  // First reader blocks writers
+    }
 
     sem_post(&mutex);
     sem_post(&queue);
 
-    // Reading section
+    // Critical Section (Reading)
     printf("Reader %d is READING\n", id);
     sleep(1);
     printf("Reader %d has FINISHED READING\n", id);
@@ -33,12 +33,11 @@ void *reader(void *arg) {
     sem_wait(&mutex);
 
     read_count--;
-
-    if (read_count == 0)
-        sem_post(&rw_mutex); // Last reader allows writer
+    if (read_count == 0) {
+        sem_post(&rw_mutex);  // Last reader allows writers
+    }
 
     sem_post(&mutex);
-
     return NULL;
 }
 
@@ -46,10 +45,10 @@ void *reader(void *arg) {
 void *writer(void *arg) {
     int id = *(int *)arg;
 
-    sem_wait(&queue);     // Writer gets priority
+    sem_wait(&queue);     // Writers get priority
     sem_wait(&rw_mutex);  // Exclusive access
 
-    // Writing section
+    // Critical Section (Writing)
     printf("\tWriter %d is WRITING\n", id);
     sleep(2);
     printf("\tWriter %d has FINISHED WRITING\n", id);
@@ -61,8 +60,10 @@ void *writer(void *arg) {
 }
 
 int main() {
-    pthread_t readers[5], writers[5];
-    int id[5];
+    int n = 5;  // Number of readers and writers
+
+    pthread_t readers[n], writers[n];
+    int id[n];
 
     // Initialize semaphores
     sem_init(&mutex, 0, 1);
@@ -70,14 +71,15 @@ int main() {
     sem_init(&queue, 0, 1);
 
     // Create threads
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < n; i++) {
         id[i] = i + 1;
+
         pthread_create(&readers[i], NULL, reader, &id[i]);
         pthread_create(&writers[i], NULL, writer, &id[i]);
     }
 
     // Join threads
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < n; i++) {
         pthread_join(readers[i], NULL);
         pthread_join(writers[i], NULL);
     }
